@@ -1,0 +1,29 @@
+{# Variables to edit #}
+{%- set sensor = 'sensor.energy' -%}
+{%- set unit = 'kr/kWh' -%}
+{%- set interval = 3 -%}
+{%- set numberToDisplay = 3 -%}
+
+Cheapest interval of {{interval}} hours:
+
+{%- set pricetable=state_attr(sensor, 'raw_today')+state_attr(sensor, 'raw_tomorrow') -%}
+{%- set Data = namespace(Spans=[]) -%}
+{%- for TimeSlot in range(0,(pricetable | count)-interval+1) -%}
+	{%- set price = namespace(value=[]) -%}
+	{%- set toTime = TimeSlot+interval-1 | int -%}
+	{%- for i in range(0,interval) -%}
+    {%- set Time = TimeSlot+i | int -%}
+    {%- set price.value = price.value+[pricetable[Time].value] -%}
+    {#{-pricetable[Time].value}#}
+  {%- endfor -%}
+  {%- set Span = {'Start':pricetable[TimeSlot].start,'End':pricetable[toTime].end,'Price':(price.value | average | float)} -%}
+  {%- if now() < Span.Start %}
+    {%- set Data.Spans = Data.Spans+[Span] -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{# Display code #}
+{%- set lowestSort = Data.Spans | sort(attribute='Price') -%}
+{%- for each in range(0,numberToDisplay) %}
+{{lowestSort[each].Start.strftime('%H')+'-'+lowestSort[each].End.strftime('%H')+'\n'+(lowestSort[each].Price | round(2) | string)+ ' ' +unit}}
+{% endfor -%}
